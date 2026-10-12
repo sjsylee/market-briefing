@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from . import grounding, models
-from .documents import PriceDocument
+from .documents import SOURCES, PriceDocument
 
 # bge-m3 기준, 관련 없는 질문(예: 데이터에 없는 종목)의 최고 유사도가 대체로 이 값 아래였다.
 MIN_SCORE = 0.45
@@ -60,7 +60,8 @@ class Answer:
 # "가장 많이 오른 셀린느 가방"처럼 순위를 묻는 질문. 유사도 검색은 상위 k개만 보므로
 # 전체에서의 최댓값을 보장하지 못한다. 이런 질문은 모델 없이 전체 문서를 계산해 답한다.
 _RANKING = re.compile(r"가장\s*(많이\s*)?(오른|상승|비싸진|내린|하락|떨어진)")
-_STOPWORDS = {"가장", "많이", "오른", "상승", "내린", "하락", "떨어진", "비싸진", "가격", "시세", "알려줘", "상품", "뭐야", "어떤", "제품"}
+_STOPWORDS = {"가장", "많이", "오른", "상승", "내린", "하락", "떨어진", "비싸진", "가격", "시세", "알려줘", "상품",
+              "뭐야", "어떤", "제품", "종목", "주식", "주가", "코스피"}
 
 
 def _strip_particle(word: str) -> str:
@@ -78,8 +79,9 @@ def ranking_answer(question: str, docs: list[dict]) -> Answer | None:
     if not pool:
         return Answer(NO_ANSWER)
     best = (min if falling else max)(pool, key=lambda d: d["change_pct"])
-    text = (f"관측된 {len(pool)}개 상품 중 {'가장 많이 내린' if falling else '가장 많이 오른'} 것은 "
-            f"{best['name']}({best['option']})로, 즉시 구매가가 {best['first_price']:,}원에서 "
+    src = SOURCES[best.get("kind", "kream")]
+    text = (f"관측된 {len(pool)}개 {src['unit']} 중 {'가장 많이 내린' if falling else '가장 많이 오른'} 것은 "
+            f"{best['name']}({best['option']})로, {src['price']}가 {best['first_price']:,}원에서 "
             f"{best['last_price']:,}원으로 {best['change_pct']:+.1f}% 변했습니다. [1]")
     return Answer(text, [{"id": best["id"], "name": best["name"], "score": None}])
 

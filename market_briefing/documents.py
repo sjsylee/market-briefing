@@ -10,6 +10,12 @@ from dataclasses import asdict, dataclass
 
 from .snapshots import Observation
 
+# 데이터 출처별 표기. 문서·원고·차트·순위 답변이 같은 이름을 쓰도록 한곳에 둔다.
+SOURCES = {
+    "kream": {"label": "KREAM", "price": "즉시 구매가", "unit": "상품"},
+    "stock": {"label": "국내 주식", "price": "종가", "unit": "종목"},
+}
+
 
 @dataclass
 class PriceDocument:
@@ -22,8 +28,9 @@ class PriceDocument:
     first_price: int
     last_price: int
     change_pct: float
-    points: list[tuple[str, int]]  # (date, 즉시 구매가)
+    points: list[tuple[str, int]]  # (date, 가격)
     text: str
+    kind: str = "kream"
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -46,10 +53,27 @@ def manwon(v: int) -> str:
 
 def spoken_fact(d: "PriceDocument") -> str:
     """브리핑 원고에 그대로 옮겨 쓸 수 있도록 낭독 표기로 정리한 한 줄 사실."""
+    # 종목코드는 소리 내어 읽을 이유가 없어 주식은 이름만 쓴다.
+    subject = d.name if d.kind == "stock" else f"{d.name}({d.option})"
     return (
-        f"{d.name}({d.option}): {korean_date(d.first_date)} {manwon(d.first_price)}에서 "
+        f"{subject}: {korean_date(d.first_date)} {manwon(d.first_price)}에서 "
         f"{korean_date(d.last_date)} {manwon(d.last_price)}으로 {abs(d.change_pct):.1f}% {'올랐다' if d.change_pct >= 0 else '내렸다'}."
     )
+
+
+_DIGIT_HAS_BATCHIM = {"0": True, "1": True, "2": False, "3": True, "4": False, "5": False, "6": True, "7": True, "8": True, "9": False}
+
+
+def topic(word: str) -> str:
+    """주제 조사 은/는을 붙인다. 마지막 한글 음절의 받침(숫자는 읽는 소리)을 기준으로 한다."""
+    for ch in reversed(word):
+        if "가" <= ch <= "힣":
+            return word + ("은" if (ord(ch) - 0xAC00) % 28 else "는")
+        if ch.isdigit():
+            return word + ("은" if _DIGIT_HAS_BATCHIM[ch] else "는")
+        if ch.isalpha():
+            return word + "는"
+    return word + "은"
 
 
 def won(v: int | None) -> str:

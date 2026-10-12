@@ -25,3 +25,10 @@ def test_spoken_fact_uses_manwon_for_narration():
     d = documents.build([obs("2026-02-01", 2_830_000), obs("2026-02-05", 3_650_000)])[0]
     assert documents.spoken_fact(d) == "테스트 러닝화(270): 2월 1일 283만 원에서 2월 5일 365만 원으로 29.0% 올랐다."
     assert documents.manwon(465_000) == "46만 5천 원"
+
+
+def test_topic_particle_follows_final_sound():
+    assert documents.topic("한미반도체") == "한미반도체는"
+    assert documents.topic("SK이노베이션") == "SK이노베이션은"
+    assert documents.topic("셀린느 백(본품+더스트백)") == "셀린느 백(본품+더스트백)은"
+    assert documents.topic("나이키(270)") == "나이키(270)은"
