@@ -95,7 +95,7 @@ def _draw(scene: Scene, kospi, path: Path, i: int, total: int) -> None:
     _header(fig, kospi)
 
     if scene.kind == "opening":
-        fig.text(0.5, 0.56, "시세 브리핑", ha="center", va="center", fontsize=54, fontweight="bold", color=NAVY)
+        fig.text(0.5, 0.56, "증시 브리핑", ha="center", va="center", fontsize=54, fontweight="bold", color=NAVY)
         fig.text(0.5, 0.44, f"국내 증시 · {korean_date(kospi[0][0])} ~ {korean_date(kospi[-1][0])}",
                  ha="center", fontsize=22, color=MUTED)
     elif scene.kind == "index":

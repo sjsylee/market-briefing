@@ -17,7 +17,9 @@
 
 ![증시 브리핑 영상의 장면들](docs/newscast-frames.png)
 
-▶ 영상 예시: [증시 브리핑 (40초, 6장면)](docs/newscast-demo.mp4) · [국내 주식 차트 브리핑](docs/stock-briefing-demo.mp4) · [KREAM 차트 브리핑](docs/briefing-demo.mp4)
+▶ 영상: [증시 브리핑 (방송 형식, 40초)](docs/newscast-demo.mp4)
+
+차트 한 장에 원고 음성을 입힌 단순형 브리핑도 있습니다: [국내 주식](docs/stock-briefing-demo.mp4) · [KREAM 시세](docs/briefing-demo.mp4)
 
 증시 브리핑 낭독 원고(전부 데이터에서 만든 문장):
 
