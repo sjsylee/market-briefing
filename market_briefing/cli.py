@@ -1,0 +1,47 @@
+"""명령줄 진입점: `market-briefing index | ask | brief`."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+from . import documents, media, retrieval, snapshots
+
+
+def main(argv: list[str] | None = None) -> None:
+    p = argparse.ArgumentParser(prog="market-briefing", description="KREAM 시세 스냅샷 RAG와 브리핑 영상 생성")
+    p.add_argument("--data", type=Path, default=Path("data/raw"), help="스냅샷 xlsx 폴더")
+    p.add_argument("--index", type=Path, default=Path("data/index"), help="색인 저장 위치")
+    sub = p.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("index", help="스냅샷을 문서화하고 임베딩 색인을 만든다")
+    a = sub.add_parser("ask", help="색인을 근거로 질문에 답한다")
+    a.add_argument("question")
+    a.add_argument("-k", type=int, default=4)
+    b = sub.add_parser("brief", help="변동 상위 상품으로 브리핑 원고·음성·영상을 만든다")
+    b.add_argument("-n", type=int, default=3)
+    b.add_argument("--out", type=Path, default=Path("out"))
+    b.add_argument("--llm-script", action="store_true", help="원고를 로컬 LLM으로 쓰고 숫자 대조를 거친다(기본: 데이터로 문장 고정)")
+    args = p.parse_args(argv)
+
+    if args.command == "index":
+        docs = documents.build(snapshots.load(args.data))
+        retrieval.Index.build(docs).save(args.index)
+        print(f"문서 {len(docs)}건을 색인했습니다 → {args.index}")
+
+    elif args.command == "ask":
+        answer = retrieval.ask(args.question, retrieval.Index.load(args.index), k=args.k)
+        print(json.dumps(answer.__dict__, ensure_ascii=False, indent=2))
+
+    elif args.command == "brief":
+        index = retrieval.Index.load(args.index)
+        docs = [documents.PriceDocument(**{**d, "points": [tuple(p) for p in d["points"]]}) for d in index.docs]
+        movers = documents.top_movers(docs, args.n)
+        script = media.write_script(movers) if args.llm_script else media.compose_script(movers)
+        result = media.render(movers, script, args.out)
+        print(json.dumps({k: str(v) for k, v in result.__dict__.items()}, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()
