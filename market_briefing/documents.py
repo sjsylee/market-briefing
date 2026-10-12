@@ -76,6 +76,20 @@ def topic(word: str) -> str:
     return word + "은"
 
 
+_DIGIT_EURO = {"0": True, "1": False, "2": False, "3": True, "4": False, "5": False, "6": True, "7": False, "8": False, "9": False}
+
+
+def ro(word: str) -> str:
+    """방향 조사 로/으로. 받침이 있으면 '으로', 없거나 ㄹ 받침이면 '로'."""
+    ch = word[-1]
+    if "가" <= ch <= "힣":
+        jong = (ord(ch) - 0xAC00) % 28
+        return word + ("으로" if jong and jong != 8 else "로")
+    if ch.isdigit():
+        return word + ("으로" if _DIGIT_EURO[ch] else "로")
+    return word + "로"
+
+
 def won(v: int | None) -> str:
     return f"{v:,}원" if v is not None else "정보 없음"
 

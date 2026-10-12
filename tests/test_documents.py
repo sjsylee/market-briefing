@@ -32,3 +32,8 @@ def test_topic_particle_follows_final_sound():
     assert documents.topic("SK이노베이션") == "SK이노베이션은"
     assert documents.topic("셀린느 백(본품+더스트백)") == "셀린느 백(본품+더스트백)은"
     assert documents.topic("나이키(270)") == "나이키(270)은"
+
+
+def test_ro_particle():
+    assert documents.ro("6,625.93") == "6,625.93으로" and documents.ro("6,621.97") == "6,621.97로"
+    assert documents.ro("서울") == "서울로" and documents.ro("부산") == "부산으로"
