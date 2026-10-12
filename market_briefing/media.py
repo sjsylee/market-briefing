@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 
 from . import grounding, models
-from .documents import PriceDocument, korean_date, spoken_fact
+from .documents import SOURCES, PriceDocument, korean_date, spoken_fact, topic
 
 SCRIPT_PROMPT = (
     "너는 시세 브리핑 원고 작성자다. 주어진 [사실]만 사용해 40초 안팎의 한국어 낭독 원고를 쓴다. "
@@ -44,8 +44,11 @@ def compose_script(movers: list[PriceDocument]) -> str:
     """
     start = min(d.first_date for d in movers)
     end = max(d.last_date for d in movers)
-    lines = [f"{korean_date(start)}부터 {korean_date(end)}까지 관측한 KREAM 시세 가운데 변동이 컸던 상품 {len(movers)}개를 전해 드립니다."]
-    lines += [spoken_fact(d).replace(": ", "은 ", 1).replace("다.", "습니다.") for d in movers]
+    src = SOURCES[movers[0].kind]
+    lines = [f"{korean_date(start)}부터 {korean_date(end)}까지 {src['label']} {src['price']} 기준으로 변동이 컸던 {src['unit']} {len(movers)}개를 전해 드립니다."]
+    for d in movers:
+        subject, rest = spoken_fact(d).split(": ", 1)
+        lines.append(f"{topic(subject)} {rest.replace('다.', '습니다.')}")
     lines.append("이 브리핑은 관측 데이터를 요약한 것이며 투자나 구매를 권하지 않습니다.")
     return " ".join(lines)
 
@@ -94,7 +97,8 @@ def draw_chart(movers: list[PriceDocument], path: Path) -> None:
 
     start = min(d.first_date for d in movers)
     end = max(d.last_date for d in movers)
-    ax.set_title(f"KREAM 즉시 구매가 변동 상위 {len(movers)}개  ·  {korean_date(start)} ~ {korean_date(end)}", fontsize=15, pad=14)
+    src = SOURCES[movers[0].kind]
+    ax.set_title(f"{src['label']} {src['price']} 변동 상위 {len(movers)}개  ·  {korean_date(start)} ~ {korean_date(end)}", fontsize=15, pad=14)
     ax.set_ylabel("첫 관측가 = 100")
     ax.axhline(100, color="#999", linewidth=1, linestyle="--")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%-m/%-d"))

@@ -6,19 +6,26 @@ import argparse
 import json
 from pathlib import Path
 
-from . import documents, media, retrieval, snapshots
+from . import agent, documents, media, retrieval, snapshots, stocks
 
 
 def main(argv: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(prog="market-briefing", description="KREAM 시세 스냅샷 RAG와 브리핑 영상 생성")
+    p = argparse.ArgumentParser(prog="market-briefing", description="시세 데이터(KREAM 스냅샷·국내 주식) RAG와 브리핑 영상 생성")
     p.add_argument("--data", type=Path, default=Path("data/raw"), help="스냅샷 xlsx 폴더")
     p.add_argument("--index", type=Path, default=Path("data/index"), help="색인 저장 위치")
     sub = p.add_subparsers(dest="command", required=True)
 
     sub.add_parser("index", help="스냅샷을 문서화하고 임베딩 색인을 만든다")
+    s = sub.add_parser("index-stocks", help="국내 주식 일별 종가로 색인을 만든다(FinanceDataReader)")
+    s.add_argument("--start", required=True)
+    s.add_argument("--end", required=True)
+    s.add_argument("--top", type=int, default=30, help="시가총액 상위 종목 수")
+    s.add_argument("--market", default="KOSPI")
     a = sub.add_parser("ask", help="색인을 근거로 질문에 답한다")
     a.add_argument("question")
     a.add_argument("-k", type=int, default=4)
+    g = sub.add_parser("agent", help="로컬 LLM이 도구를 골라 답한다(Function Calling)")
+    g.add_argument("question")
     b = sub.add_parser("brief", help="변동 상위 상품으로 브리핑 원고·음성·영상을 만든다")
     b.add_argument("-n", type=int, default=3)
     b.add_argument("--out", type=Path, default=Path("out"))
@@ -30,9 +37,18 @@ def main(argv: list[str] | None = None) -> None:
         retrieval.Index.build(docs).save(args.index)
         print(f"문서 {len(docs)}건을 색인했습니다 → {args.index}")
 
+    elif args.command == "index-stocks":
+        docs = stocks.fetch(args.start, args.end, args.top, args.market)
+        retrieval.Index.build(docs).save(args.index)
+        print(f"{args.market} {len(docs)}개 종목을 색인했습니다 → {args.index}")
+
     elif args.command == "ask":
         answer = retrieval.ask(args.question, retrieval.Index.load(args.index), k=args.k)
         print(json.dumps(answer.__dict__, ensure_ascii=False, indent=2))
+
+    elif args.command == "agent":
+        result = agent.run(args.question, retrieval.Index.load(args.index))
+        print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
 
     elif args.command == "brief":
         index = retrieval.Index.load(args.index)

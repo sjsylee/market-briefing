@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "KREAM 시세 스냅샷으로 만드는 근거 기반 질의응답(RAG)과 브리핑 음성·영상"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["numpy>=2.0", "openpyxl>=3.1", "matplotlib>=3.9", "requests>=2.32"]
+dependencies = ["numpy>=2.0", "openpyxl>=3.1", "matplotlib>=3.9", "requests>=2.32", "finance-datareader>=0.9", "mcp>=2.3"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
