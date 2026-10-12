@@ -6,7 +6,7 @@
 1. **근거 기반 질의응답(RAG)** — "SK하이닉스 주가는 어땠어?" 같은 질문에, 검색된 시세 문서만 근거로 출처를 붙여 답합니다.
 2. **Function Calling 에이전트** — 로컬 LLM이 검색·순위 계산 도구를 골라 인자를 채우고, 코드는 그 인자를 검증한 뒤에만 실행합니다.
 3. **MCP 서버** — 같은 도구를 Claude Code 같은 MCP 클라이언트에서 쓸 수 있게 노출합니다.
-4. **시세 브리핑 음성·영상** — 변동이 컸던 대상을 골라 낭독 원고를 만들고, 음성과 차트를 합쳐 짧은 브리핑 영상으로 내보냅니다.
+4. **증시 브리핑 영상** — 경제 방송의 브리핑 형식(오프닝 → 코스피 지수 → 종목별 장면 → 클로징)으로, 장면마다 낭독 음성과 자막을 맞춘 영상을 만듭니다.
 
 | 데이터 | 출처 | 규모 |
 |---|---|---|
@@ -15,9 +15,13 @@
 
 임베딩과 답변 생성은 [Ollama](https://ollama.com) 로컬 모델(bge-m3, qwen2.5:3b), 음성은 macOS 내장 TTS, 영상은 ffmpeg로 처리합니다. 외부 API를 쓰지 않아 비용이 들지 않고 데이터가 밖으로 나가지 않습니다.
 
-![국내 주식 브리핑 차트](docs/stock-briefing-chart.png)
+![증시 브리핑 영상의 장면들](docs/newscast-frames.png)
 
-▶ 브리핑 영상 예시: [국내 주식 (37초)](docs/stock-briefing-demo.mp4) · [KREAM (50초)](docs/briefing-demo.mp4)
+▶ 영상 예시: [증시 브리핑 (40초, 6장면)](docs/newscast-demo.mp4) · [국내 주식 차트 브리핑](docs/stock-briefing-demo.mp4) · [KREAM 차트 브리핑](docs/briefing-demo.mp4)
+
+증시 브리핑 낭독 원고(전부 데이터에서 만든 문장):
+
+> 9월 1일부터 10월 8일까지의 국내 증시 흐름을 정리해 드립니다. 이 기간 코스피 지수는 6,835.80에서 6,625.93으로 3.1% 내렸습니다. 한미반도체는 21만 5천 원에서 26만 3천 원으로 22.3% 올랐습니다. SK이노베이션은 13만 5천 원에서 16만 1천 원으로 19.4% 올랐습니다. 삼성바이오로직스는 150만 8천 원에서 122만 원으로 19.1% 내렸습니다. …
 
 ## 예시
 
@@ -57,6 +61,8 @@
 
 변동 상위 n개 ─▶ 원고(데이터로 문장 고정 | --llm-script) ─▶ macOS say ─┐
               └▶ matplotlib 차트 ──────────────────────────────────────┴▶ ffmpeg mp4
+
+증시 브리핑: 장면 계획(지수·종목) ─▶ 장면별 TTS → 길이 측정 ─▶ 장면 이미지(헤드라인·차트·자막) ─▶ 장면별 mp4 ─▶ ffmpeg concat
 ```
 
 ## 설계하면서 정한 것
@@ -75,6 +81,7 @@
 
 - 스냅샷이 9개이고 관측 간격이 일정하지 않습니다. 상품마다 관측 횟수도 달라, 변동률은 "첫 관측 대비 마지막 관측"이라는 단순한 값입니다.
 - 숫자 대조는 문장 의미를 보지 않습니다. 근거에 있는 숫자를 엉뚱한 상품에 붙이는 오류는 잡지 못합니다.
+- 코스피 지수는 FinanceDataReader의 Yahoo 경로(`^KS11`)를 씁니다. 기본 경로는 이 기간 데이터가 중간까지만 있었습니다.
 - 주식 종가는 FinanceDataReader가 주는 값을 그대로 써서, 일부 종목은 수정주가로 소수 단위가 섞입니다(예: 1,508,299원).
 - 이름 필터는 종목명 문자열만 봅니다. "반도체 종목"처럼 업종으로 묻는 질문은 업종 정보가 없어 정확히 거르지 못합니다.
 - `ask`의 순위 질문 판별은 정규식 기반이라 "제일 비싸게 팔리는" 같은 표현은 아직 일반 검색 경로로 갑니다.
@@ -100,6 +107,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 # 국내 주식 종가로 실행
 .venv/bin/market-briefing --index data/index-stocks index-stocks --start 2026-09-01 --end 2026-10-10 --top 30
 .venv/bin/market-briefing --index data/index-stocks agent "삼성 이름 들어간 종목 중 가장 많이 오른 건?"
+.venv/bin/market-briefing --index data/index-stocks newscast   # out-newscast/newscast.mp4
 ```
 
 MCP 서버로 쓰려면 Claude Code에 등록합니다.
@@ -116,7 +124,7 @@ claude mcp add market-briefing -e MARKET_BRIEFING_INDEX=$PWD/data/index-stocks -
 .venv/bin/python -m pytest -q
 ```
 
-임베딩과 LLM은 상품명 키워드로 만든 가짜 임베더와 순서대로 응답하는 가짜 모델로 바꿔 끼워서, 모델 없이도 검색·거절·숫자 대조·원고 재시도·순위 계산·도구 인자 검증·MCP 도구를 확인합니다(32개).
+임베딩과 LLM은 상품명 키워드로 만든 가짜 임베더와 순서대로 응답하는 가짜 모델로 바꿔 끼워서, 모델 없이도 검색·거절·숫자 대조·원고 재시도·순위 계산·도구 인자 검증·MCP 도구·브리핑 장면 문장을 확인합니다(35개).
 
 ## 구조
 
@@ -130,6 +138,7 @@ market_briefing/
   agent.py       Function Calling 에이전트 (도구 선택·인자 검증·근거 대조)
   mcp_server.py  MCP 서버 (search_prices, rank_movers, make_briefing)
   media.py       원고 작성, 차트, TTS, ffmpeg 합성
+  newscast.py    증시 브리핑(장면 계획, 장면별 음성·자막, 영상 이어 붙이기)
   models.py      Ollama 호출 (테스트에서 교체)
   cli.py         index / ask / brief
 ```

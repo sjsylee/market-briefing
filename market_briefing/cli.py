@@ -6,7 +6,9 @@ import argparse
 import json
 from pathlib import Path
 
-from . import agent, documents, media, retrieval, snapshots, stocks
+import numpy as np
+
+from . import agent, documents, media, newscast, retrieval, snapshots, stocks
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -26,6 +28,10 @@ def main(argv: list[str] | None = None) -> None:
     a.add_argument("-k", type=int, default=4)
     g = sub.add_parser("agent", help="로컬 LLM이 도구를 골라 답한다(Function Calling)")
     g.add_argument("question")
+    nc = sub.add_parser("newscast", help="국내 주식 색인으로 증시 브리핑(방송 형식) 영상을 만든다")
+    nc.add_argument("-n", type=int, default=3)
+    nc.add_argument("--out", type=Path, default=Path("out-newscast"))
+    nc.add_argument("--symbol", default="^KS11", help="지수 심볼(FinanceDataReader)")
     b = sub.add_parser("brief", help="변동 상위 상품으로 브리핑 원고·음성·영상을 만든다")
     b.add_argument("-n", type=int, default=3)
     b.add_argument("--out", type=Path, default=Path("out"))
@@ -49,6 +55,16 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "agent":
         result = agent.run(args.question, retrieval.Index.load(args.index))
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+
+    elif args.command == "newscast":
+        index = retrieval.Index.load(args.index)
+        docs = [documents.PriceDocument(**{**d, "points": [tuple(p) for p in d["points"]]}) for d in index.docs]
+        movers = documents.top_movers(docs, args.n)
+        start = min(d.first_date for d in movers)
+        end = max(d.last_date for d in movers)
+        kospi = newscast.index_points(start, (np.datetime64(end) + np.timedelta64(1, "D")).astype(str), args.symbol)
+        video = newscast.render(newscast.plan(movers, kospi), kospi, args.out)
+        print(video)
 
     elif args.command == "brief":
         index = retrieval.Index.load(args.index)
